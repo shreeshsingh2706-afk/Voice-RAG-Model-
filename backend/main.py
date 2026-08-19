@@ -246,6 +246,7 @@ async def status():
 
 
 @app.post("/api/query", response_model=QueryResponse, tags=["rag"])
+@app.post("/query", response_model=QueryResponse, include_in_schema=False)
 async def query(request: QueryRequest):
     """
     Main RAG endpoint.
@@ -300,6 +301,7 @@ async def query(request: QueryRequest):
 
 
 @app.post("/api/voice", response_model=VoiceQueryResponse, tags=["rag"])
+@app.post("/voice", response_model=VoiceQueryResponse, include_in_schema=False)
 async def voice_query(
     file: UploadFile = File(...),
     language_code: str = Form("en-IN")

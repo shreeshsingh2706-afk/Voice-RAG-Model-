@@ -21,7 +21,12 @@ export default function Home() {
     "Who invented the telephone?",
   ];
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  let rawApiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  rawApiBase = rawApiBase.trim().replace(/\/+$/, "");
+  if (rawApiBase.endsWith("/api")) {
+    rawApiBase = rawApiBase.slice(0, -4);
+  }
+  const API_BASE = rawApiBase;
 
   // Fetch backend status on mount
   useEffect(() => {
