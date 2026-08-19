@@ -1,0 +1,33 @@
+# ── Web Framework ─────────────────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9        # needed for file uploads (voice later)
+
+# ── Dataset ───────────────────────────────────────────────────────────────────
+datasets==2.19.1               # Hugging Face datasets library
+huggingface-hub==0.23.2
+
+# ── Embeddings ────────────────────────────────────────────────────────────────
+sentence-transformers==3.0.1   # runs BGE-small embedding model locally
+torch==2.3.1                   # deep learning engine (Python 3.11 compatible)
+
+# ── Vector Database ───────────────────────────────────────────────────────────
+qdrant-client==1.9.1           # Qdrant Python client
+
+# ── BM25 Keyword Search ───────────────────────────────────────────────────────
+rank-bm25==0.2.2               # lightweight BM25 implementation
+
+# ── Reranking ─────────────────────────────────────────────────────────────────
+# cross-encoder is part of sentence-transformers (already listed above)
+
+# ── LLM (Groq - fast, free tier) ─────────────────────────────────────────────
+groq==0.9.0                    # Groq API client (Llama-3 - very fast)
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv==1.0.1           # loads .env file into environment variables
+pydantic==2.7.1                # data validation (FastAPI uses this internally)
+numpy==1.26.4                  # numerical operations
+tqdm==4.66.4                   # progress bars during indexing
+
+# ── Voice (Phase 14 - Sarvam) ─────────────────────────────────────────────────
+httpx==0.27.0                  # async HTTP client for Sarvam API calls
