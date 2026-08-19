@@ -106,16 +106,44 @@ def vector_search(query: str,
             "source":      "vector",   ← so hybrid search knows where this came from
         }
     """
-    model  = _get_model()
     client = _get_client()
 
-    # Step 1: Embed the query
+    # Step 1: Embed the query (try Hugging Face cloud API first to save memory, fallback to local model)
     t0 = time.time()
-    query_vector = model.encode(
-        query,
-        normalize_embeddings=True,
-        convert_to_numpy=True,
-    ).tolist()
+    query_vector = None
+    
+    # Try Cloud API first
+    import requests
+    hf_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{EMBEDDING_MODEL}"
+    headers = {}
+    hf_token = os.getenv("HF_TOKEN")
+    if hf_token:
+        headers["Authorization"] = f"Bearer {hf_token}"
+        
+    try:
+        response = requests.post(hf_url, headers=headers, json={"inputs": query, "options": {"wait_for_model": True}}, timeout=5)
+        if response.status_code == 200:
+            res_json = response.json()
+            if isinstance(res_json, list) and len(res_json) > 0:
+                # If nested, flatten
+                if isinstance(res_json[0], list):
+                    query_vector = res_json[0]
+                else:
+                    query_vector = res_json
+                print("⚡ Query embedded via HuggingFace Cloud API")
+    except Exception as e:
+        print(f"⚠️ Cloud embedding failed ({e}), falling back to local model...")
+
+    if query_vector is None:
+        # Fallback to local model
+        model = _get_model()
+        query_vector = model.encode(
+            query,
+            normalize_embeddings=True,
+            convert_to_numpy=True,
+        ).tolist()
+        print("💾 Query embedded via Local SentenceTransformer")
+
     embed_ms = (time.time() - t0) * 1000
 
     # Step 2: Search Qdrant
