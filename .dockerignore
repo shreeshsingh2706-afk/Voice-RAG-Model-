@@ -1,0 +1,12 @@
+venv/
+.venv/
+data/qdrant/
+data/bm25_index.pkl
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.env
+frontend/node_modules/
+frontend/.next/
+*.log

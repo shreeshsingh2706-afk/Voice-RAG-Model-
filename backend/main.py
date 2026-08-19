@@ -80,31 +80,45 @@ log = logging.getLogger("voice-rag")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Lightweight startup — models are loaded lazily on first request.
+    Server startup — pre-loads all ML models into memory.
 
-    WHY LAZY LOADING?
-    -----------------
-    The free tier on Render/Railway gives 512MB RAM.
-    Loading all models at startup (BGE + Cross-Encoder + BM25) needs ~800MB,
-    which causes an Out-of-Memory crash before the server even opens a port.
-
-    With lazy loading:
-    - Startup uses ~50MB  → server starts successfully
-    - First query loads models → ~10-15s one-time delay
-    - All subsequent queries use pre-loaded models → fast as before
-
-    Trade-off: First query is slow. Every query after that is fast.
+    LAZY_LOAD=true env var → skip pre-warming (for Render 512MB free tier).
+    LAZY_LOAD not set      → eager loading (default, for HuggingFace Spaces 16GB).
     """
+    lazy = os.getenv("LAZY_LOAD", "false").lower() == "true"
+
     log.info("═" * 55)
-    log.info("  Voice-RAG Server Starting Up (Lazy Load Mode)")
+    log.info("  Voice-RAG Server Starting Up")
+    log.info(f"  Mode: {'Lazy Load (models load on first request)' if lazy else 'Eager Load (pre-warming all models)'}")
     log.info("═" * 55)
-    log.info("  Models will load on first request (~10-15s delay)")
+
+    if not lazy:
+        t_start = time.time()
+
+        log.info("Loading BGE-small embedding model...")
+        _get_model()
+        _get_client()
+        log.info("✅ BGE model + Qdrant ready")
+
+        log.info("Loading BM25 index...")
+        _get_bm25()
+        log.info("✅ BM25 index ready")
+
+        log.info("Loading cross-encoder reranker...")
+        _get_reranker()
+        log.info("✅ Reranker ready")
+
+        elapsed = round(time.time() - t_start, 1)
+        log.info("═" * 55)
+        log.info(f"  🚀 All models warm! Startup took {elapsed}s")
+    else:
+        log.info("  Models will load on first request (~15s delay)")
+
     log.info("  📖 API docs: /docs")
     log.info("═" * 55)
 
-    yield   # ← server runs here, accepting requests
+    yield
 
-    # Shutdown
     log.info("Server shutting down.")
 
 
