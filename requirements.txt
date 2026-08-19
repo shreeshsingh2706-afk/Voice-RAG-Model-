@@ -1,15 +1,17 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # ── Web Framework ─────────────────────────────────────────────────────────────
 fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
 python-multipart>=0.0.9
 
+# ── Embeddings (CPU-only build to avoid 30+ heavy NVIDIA CUDA packages on free tier) ──
+torch>=2.0.0
+sentence-transformers>=2.2.0
+
 # ── Dataset ───────────────────────────────────────────────────────────────────
 datasets>=2.19.0
 huggingface-hub>=0.23.0
-
-# ── Embeddings ────────────────────────────────────────────────────────────────
-sentence-transformers>=2.2.0
-torch>=2.0.0
 
 # ── Vector Database ───────────────────────────────────────────────────────────
 qdrant-client>=1.9.0

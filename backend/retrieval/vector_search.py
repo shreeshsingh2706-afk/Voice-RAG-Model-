@@ -30,7 +30,6 @@ import os
 import sys
 import time
 
-from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -50,13 +49,15 @@ from backend.config import (
 # is imported, then reuse it for every query. This is critical for latency.
 # ─────────────────────────────────────────────────────────────────────────────
 
-_model: SentenceTransformer | None = None
+_model: "SentenceTransformer | None" = None
 _client: QdrantClient | None = None
 
 
-def _get_model() -> SentenceTransformer:
+def _get_model():
+    """Load BGE-small embedding model once (lazy singleton)."""
     global _model
     if _model is None:
+        from sentence_transformers import SentenceTransformer
         print(f"🤖 Loading BGE model: {EMBEDDING_MODEL}")
         _model = SentenceTransformer(EMBEDDING_MODEL)
     return _model

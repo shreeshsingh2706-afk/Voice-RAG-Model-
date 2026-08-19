@@ -60,8 +60,6 @@ import os
 import sys
 import time
 
-from sentence_transformers import CrossEncoder
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from backend.config import TOP_K_FINAL
 
@@ -69,12 +67,14 @@ from backend.config import TOP_K_FINAL
 RERANKER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 # Module-level singleton (load once, reuse)
-_reranker: CrossEncoder | None = None
+_reranker = None
 
 
-def _get_reranker() -> CrossEncoder:
+def _get_reranker():
+    """Load cross-encoder once (lazy singleton)."""
     global _reranker
     if _reranker is None:
+        from sentence_transformers import CrossEncoder
         print(f"🔀 Loading reranker: {RERANKER_MODEL_NAME}")
         print("   (First time: downloads ~90MB. After that: instant from cache)")
         _reranker = CrossEncoder(RERANKER_MODEL_NAME)
