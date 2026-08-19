@@ -77,8 +77,10 @@ export default function AudioRecorder({ onResult, isProcessing, setIsProcessing 
     formData.append("file", blob, "user_recording.webm");
     formData.append("language_code", language);
 
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
     try {
-      const res = await fetch("http://localhost:8000/api/voice", {
+      const res = await fetch(`${API_BASE}/api/voice`, {
         method: "POST",
         body: formData,
       });

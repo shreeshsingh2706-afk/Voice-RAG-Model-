@@ -21,13 +21,15 @@ export default function Home() {
     "Who invented the telephone?",
   ];
 
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
   // Fetch backend status on mount
   useEffect(() => {
-    fetch("http://localhost:8000/api/status")
+    fetch(`${API_BASE}/api/status`)
       .then((res) => res.json())
       .then((data) => setServerStatus(data))
       .catch((err) => console.log("Backend offline:", err));
-  }, []);
+  }, [API_BASE]);
 
   const handleTextSubmit = async (e) => {
     if (e) e.preventDefault();
@@ -37,7 +39,7 @@ export default function Home() {
     setResponse(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/query", {
+      const res = await fetch(`${API_BASE}/api/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: textQuery.trim() }),
