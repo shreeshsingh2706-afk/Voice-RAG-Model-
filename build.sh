@@ -1,6 +1,7 @@
 #!/bin/bash
 # build.sh — Render.com build script
-# Installs CPU-only PyTorch to stay well within 512MB RAM free tier limit
+# Installs CPU-only PyTorch and pre-downloads model files during build time
+# to prevent timeout crashes on first user query.
 
 set -e
 
@@ -16,5 +17,10 @@ pip install torch --index-url https://download.pytorch.org/whl/cpu
 
 # Install the rest of the dependencies
 pip install --retries 10 --timeout 120 -r requirements.txt
+
+# Pre-download BGE-small embedding model to local cache during build time.
+# This prevents the first request from timing out (takes under 2 seconds to load from disk).
+echo "🤖 Pre-downloading BGE-small embedding model..."
+python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
 
 echo "=== Build Complete ==="
