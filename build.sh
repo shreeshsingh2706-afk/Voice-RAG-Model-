@@ -1,7 +1,7 @@
 #!/bin/bash
 # build.sh — Render.com build script
-# Installs CPU-only PyTorch and pre-downloads model files during build time
-# to prevent timeout crashes on first user query.
+# Installs CPU-only PyTorch, pre-downloads model files, and pre-builds BM25 index
+# during build time to prevent timeout crashes on first user query.
 
 set -e
 
@@ -22,5 +22,12 @@ pip install --retries 10 --timeout 120 -r requirements.txt
 # This prevents the first request from timing out (takes under 2 seconds to load from disk).
 echo "🤖 Pre-downloading BGE-small embedding model..."
 python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
+
+# Pre-build BM25 index cache file (data/bm25_index.pkl) during build time.
+# This avoids downloading the Hugging Face dataset and tokenizing it during runtime,
+# ensuring first-query response time is under 1.5 seconds.
+echo "📂 Pre-building BM25 index cache..."
+mkdir -p data
+python -c "import sys, os; sys.path.insert(0, os.path.abspath('.')); from backend.retrieval.bm25_search import _get_bm25; _get_bm25()"
 
 echo "=== Build Complete ==="
