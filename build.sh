@@ -24,10 +24,16 @@ echo "🤖 Pre-downloading BGE-small embedding model..."
 python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
 
 # Pre-build BM25 index cache file (data/bm25_index.pkl) during build time.
-# This avoids downloading the Hugging Face dataset and tokenizing it during runtime,
-# ensuring first-query response time is under 1.5 seconds.
+# If local parquet is missing, load_dataset.py automatically streams from HuggingFace.
+# The result is cached to disk so the first query is fast.
 echo "📂 Pre-building BM25 index cache..."
 mkdir -p data
-python -c "import sys, os; sys.path.insert(0, os.path.abspath('.')); from backend.retrieval.bm25_search import _get_bm25; _get_bm25()"
+TOKENIZERS_PARALLELISM=false python -c "
+import sys, os
+sys.path.insert(0, os.path.abspath('.'))
+from backend.retrieval.bm25_search import _get_bm25
+_get_bm25()
+print('BM25 cache built successfully.')
+"
 
 echo "=== Build Complete ==="

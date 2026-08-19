@@ -48,6 +48,75 @@ PARQUET_PATH = "data/raw/train/hintrain.parquet"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# HuggingFace streaming fallback
+# Used when parquet file is not available (e.g. Render deployment)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _load_documents_from_hf(max_questions: int = 2000) -> list[dict]:
+    """
+    Stream documents directly from HuggingFace datasets API.
+    Used as fallback when the local parquet file is not available.
+    Slower than parquet (downloads on-the-fly) but requires no local files.
+    """
+    from datasets import load_dataset as hf_load_dataset
+
+    print(f"📥 Streaming {max_questions:,} questions from HuggingFace (no local parquet)...")
+    print("   Dataset: ai4bharat/MSMARCO-XL (train split, Hindi subset)")
+
+    ds = hf_load_dataset(
+        "ai4bharat/MSMARCO-XL",
+        "hi",
+        split="train",
+        streaming=True,
+        trust_remote_code=True,
+    )
+
+    documents = []
+    q_count = 0
+    skipped = 0
+
+    for row in ds:
+        if q_count >= max_questions:
+            break
+
+        passages_field = row.get("passages", {})
+        eng_passages   = passages_field.get("English_passages", [])
+        is_selected    = passages_field.get("is_selected", [])
+
+        if not eng_passages:
+            skipped += 1
+            continue
+
+        query_id   = str(row.get("query_id", q_count))
+        eng_query  = row.get("Eng_Query", "") or ""
+        query_type = row.get("query_type", "") or ""
+
+        for p_idx, text in enumerate(eng_passages):
+            if not text or not text.strip():
+                continue
+
+            selected = 0
+            if p_idx < len(is_selected):
+                selected = int(is_selected[p_idx])
+
+            documents.append({
+                "id":          f"q{query_id}_p{p_idx}",
+                "text":        text.strip(),
+                "query_id":    query_id,
+                "query":       eng_query.strip(),
+                "is_selected": selected,
+                "query_type":  query_type,
+            })
+
+        q_count += 1
+        if q_count % 200 == 0:
+            print(f"   Streamed {q_count:,}/{max_questions:,} questions ({len(documents):,} docs)...")
+
+    print(f"✅ Streamed {len(documents):,} passages from {q_count:,} questions")
+    return documents
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # STEP 1: Inspect — show the structure
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -153,10 +222,9 @@ def load_documents(max_questions: int = 5000, batch_size: int = 500) -> list[dic
     """
 
     if not os.path.exists(PARQUET_PATH):
-        raise FileNotFoundError(
-            f"Parquet file not found: {PARQUET_PATH}\n"
-            "Run: python -m backend.ingestion.load_dataset --download"
-        )
+        print(f"⚠️  Local parquet not found at {PARQUET_PATH}")
+        print("   Falling back to HuggingFace streaming API...")
+        return _load_documents_from_hf(max_questions=max_questions)
 
     print(f"📥 Loading up to {max_questions:,} questions from MSMARCO-XI...")
     print(f"   Each question has ~10 passages → up to {max_questions * 10:,} documents")
