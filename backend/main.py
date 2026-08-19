@@ -80,37 +80,26 @@ log = logging.getLogger("voice-rag")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Code inside 'async with lifespan' runs on server startup.
-    We pre-load all models here so the first real query is fast.
+    Lightweight startup — models are loaded lazily on first request.
 
-    This is like a restaurant kitchen prepping ingredients before opening.
+    WHY LAZY LOADING?
+    -----------------
+    The free tier on Render/Railway gives 512MB RAM.
+    Loading all models at startup (BGE + Cross-Encoder + BM25) needs ~800MB,
+    which causes an Out-of-Memory crash before the server even opens a port.
+
+    With lazy loading:
+    - Startup uses ~50MB  → server starts successfully
+    - First query loads models → ~10-15s one-time delay
+    - All subsequent queries use pre-loaded models → fast as before
+
+    Trade-off: First query is slow. Every query after that is fast.
     """
     log.info("═" * 55)
-    log.info("  Voice-RAG Server Starting Up")
+    log.info("  Voice-RAG Server Starting Up (Lazy Load Mode)")
     log.info("═" * 55)
-
-    t_start = time.time()
-
-    # Pre-load BGE embedding model + Qdrant client
-    log.info("Loading BGE-small embedding model...")
-    _get_model()
-    _get_client()
-    log.info("✅ BGE model + Qdrant ready")
-
-    # Pre-load BM25 index
-    log.info("Loading BM25 index...")
-    _get_bm25()
-    log.info("✅ BM25 index ready")
-
-    # Pre-load cross-encoder reranker
-    log.info("Loading cross-encoder reranker...")
-    _get_reranker()
-    log.info("✅ Reranker ready")
-
-    elapsed = round(time.time() - t_start, 1)
-    log.info("═" * 55)
-    log.info(f"  🚀 All models warm! Startup took {elapsed}s")
-    log.info("  📖 API docs: http://localhost:8000/docs")
+    log.info("  Models will load on first request (~10-15s delay)")
+    log.info("  📖 API docs: /docs")
     log.info("═" * 55)
 
     yield   # ← server runs here, accepting requests
