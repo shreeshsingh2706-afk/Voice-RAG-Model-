@@ -1,3 +1,14 @@
+---
+title: Voice RAG Backend
+emoji: 🎙️
+colorFrom: indigo
+colorTo: cyan
+sdk: gradio
+sdk_version: 4.36.1
+app_file: app.py
+pinned: false
+---
+
 # 🎙️ Voice-Enabled RAG Model (MSMARCO-XI)
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111.0-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
