@@ -51,6 +51,10 @@ from backend.guardrails.input_guard import check_input_guardrails
 from backend.guardrails.output_guard import check_output_guardrails
 from backend.config import TOP_K_RETRIEVAL, TOP_K_FINAL
 
+# DISABLE_RERANKER=true skips the CrossEncoder (~90MB) to save RAM on free tier
+# Trade-off: slightly lower precision, but fits within 512MB Render limit
+DISABLE_RERANKER = os.getenv("DISABLE_RERANKER", "false").lower() == "true"
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Confidence threshold
 # If the best rerank score is below this, the system says "I don't know"
@@ -163,16 +167,25 @@ def rag_pipeline(question: str) -> dict:
         return _error_response(question, f"Retrieval failed: {e}", pipeline_start)
 
     # ── Step 2: Rerank → top 3 ────────────────────────────────────────────────
-    try:
-        t2    = time.time()
-        top_k = rerank(question, candidates, top_k=TOP_K_FINAL)
-        rerank_ms = top_k[0]["rerank_ms"] if top_k else round((time.time() - t2) * 1000, 1)
+    if DISABLE_RERANKER:
+        # Skip CrossEncoder to save ~90MB RAM on free tier
+        # Use RRF scores directly, pick top TOP_K_FINAL candidates
+        top_k = sorted(candidates, key=lambda x: x.get("rrf_score", 0), reverse=True)[:TOP_K_FINAL]
+        for c in top_k:
+            c["rerank_score"] = c.get("rrf_score", 0)  # use RRF score as proxy
+            c["rerank_ms"] = 0
+        rerank_ms = 0
+    else:
+        try:
+            t2    = time.time()
+            top_k = rerank(question, candidates, top_k=TOP_K_FINAL)
+            rerank_ms = top_k[0]["rerank_ms"] if top_k else round((time.time() - t2) * 1000, 1)
 
-    except Exception as e:
-        return _error_response(question, f"Reranking failed: {e}", pipeline_start)
+        except Exception as e:
+            return _error_response(question, f"Reranking failed: {e}", pipeline_start)
 
     # ── Step 2b: Confidence check ─────────────────────────────────────────────
-    if not top_k or top_k[0]["rerank_score"] < MIN_RERANK_SCORE:
+    if not top_k or (not DISABLE_RERANKER and top_k[0]["rerank_score"] < MIN_RERANK_SCORE):
         total_ms = round((time.time() - pipeline_start) * 1000, 1)
         return {
             "question":   question,
