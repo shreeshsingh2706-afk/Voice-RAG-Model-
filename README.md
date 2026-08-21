@@ -103,11 +103,11 @@ Applied to top-20 candidates → picks top-5. This specific model is trained on 
 
 Three strategies, three collections. Each is an independent "view" of the same corpus.
 
-| Strategy | Collection | Description | Avg Words | Best For |
-|---|---|---|---|---|
-| **Fixed-size** | `msmarco_fixed` | 300-word window, 50-word overlap | ~85 | Broad context windows, consistent length |
-| **Semantic** | `msmarco_semantic` | Sentence-boundary split, greedy merge ≤250 words | ~70 | Coherent passages, no mid-sentence cuts |
-| **Metadata-aware** | `msmarco_metadata` | Semantic + payload indexing (language, position, doc_id) | ~70 | Filtered search by language / query type |
+| Strategy | Collection | Description | Chunks | Avg Words | Build Time | Best For |
+|---|---|---|---|---|---|---|
+| **Fixed-size** | `msmarco_fixed` | 300-word window, 50-word overlap | 19,963 | 56 | 206s | Broad context windows, consistent length |
+| **Semantic** | `msmarco_semantic` | Sentence-boundary split, greedy merge ≤250 words | 19,963 | 56 | 199s | Coherent passages, no mid-sentence cuts |
+| **Metadata-aware** | `msmarco_metadata` | Semantic + payload indexing (language, position, doc_id) | 19,963 | 56 | 183s | Filtered search by language / query type |
 
 > See `backend/ingestion/chunkers.py` for the implementation of all three strategies with the common `chunk(doc) -> List[Chunk]` interface.
 
@@ -145,18 +145,22 @@ No LLM call is made — saves cost and latency, and avoids hallucination.
 
 > **Honest breakdown**: The 200ms target applies to the **retrieval-only stage** (embedding + vector search + RRF). Sarvam STT and Groq LLM are external network calls with hard lower bounds of 500–1500ms each — these cannot be reduced by implementation. We report both numbers transparently.
 
-See **[`backend/eval/latency_report.md`](backend/eval/latency_report.md)** for the full P50/P70/P100 table (75 queries sampled from MSMARCO-XI).
+See **[`backend/eval/latency_report.md`](backend/eval/latency_report.md)** for the full analysis (75 queries sampled from MSMARCO-XI, `random.seed(42)`).
 
-Summary (approximate — see report for exact numbers with sample size):
+**Measured results (Qdrant Cloud eu-west-1, warm models, queries 2–75):**
 
-| Stage | P50 | P70 | P100 |
-|---|---|---|---|
-| Query Embedding | ~45ms | ~80ms | ~180ms |
-| 3-Collection Vector Search | ~60ms | ~100ms | ~250ms |
-| Cross-Encoder Reranker | ~130ms | ~200ms | ~280ms |
-| **Retrieval-Only Total** | **~240ms** | ~380ms | ~520ms |
-| LLM Generation (Groq) | ~320ms | ~750ms | ~1100ms |
-| **End-to-End (text in)** | **~670ms** | ~1100ms | ~1600ms |
+| Stage | P50 | P70 | P100 | Notes |
+|---|---:|---:|---:|---|
+| Query Embedding | 13ms | 22ms | — | Local BGE-small, fast |
+| 3-Collection Search | 322ms | 374ms | — | **Network bottleneck** (cloud→India RTT) |
+| RRF Fusion | 0.1ms | 0.2ms | — | Negligible |
+| Cross-Encoder Rerank | 116ms | 132ms | — | Local cross-encoder |
+| **Retrieval Total** | **464ms** | **516ms** | — | P50 misses 200ms target |
+| Sarvam STT | ~500ms | ~800ms | — | External API, audio-length dependent |
+| LLM Generation (Groq) | ~350ms | ~750ms | — | External API |
+| **End-to-End (text)** | **~1.1s** | **~1.5s** | — | No STT |
+
+> **Why 200ms is missed**: The bottleneck is 3 parallel network round-trips to Qdrant Cloud (eu-west-1, Ireland) from India — ~120ms RTT each. Embedding itself takes only **13ms P50**. Deploying Qdrant Cloud in `ap-south-1` (Mumbai) would reduce retrieval P50 to ~200ms; a local Qdrant instance reduces it to ~50ms. See [`latency_report.md`](backend/eval/latency_report.md) for the full breakdown.
 
 ---
 
