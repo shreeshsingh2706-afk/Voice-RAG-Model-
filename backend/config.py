@@ -37,6 +37,12 @@ def get_qdrant_client():
         return QdrantClient(path=QDRANT_LOCAL_PATH)
     return QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
+# ── HuggingFace Settings ───────────────────────────────────────────────────────
+HF_TOKEN = os.getenv("HF_TOKEN")
+if HF_TOKEN:
+    os.environ["HF_TOKEN"] = HF_TOKEN
+    os.environ["HUGGING_FACE_HUB_TOKEN"] = HF_TOKEN
+
 # ── Embedding Model ───────────────────────────────────────────────────────────
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
 # BGE-small produces 384-dimensional vectors
