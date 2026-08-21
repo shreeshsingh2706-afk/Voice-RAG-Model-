@@ -28,7 +28,7 @@ python -c "from sentence_transformers import SentenceTransformer; SentenceTransf
 # The result is cached to disk so the first query is fast.
 echo "📂 Pre-building BM25 index cache..."
 mkdir -p data
-TOKENIZERS_PARALLELISM=false python -c "
+TOKENIZERS_PARALLELISM=false PYTHONWARNINGS="ignore" python -c "
 import sys, os
 sys.path.insert(0, os.path.abspath('.'))
 from backend.retrieval.bm25_search import _get_bm25

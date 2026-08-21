@@ -177,11 +177,12 @@ def _get_bm25() -> tuple[BM25Okapi, list[dict]]:
         _bm25, _bm25_chunks = cached
         return _bm25, _bm25_chunks
 
-    # Build from scratch — load 2000 questions (same as Qdrant index)
-    print("⚠️  No BM25 cache found. Building from scratch...")
+    # Build from scratch — use 100 questions if streaming over network (Render), 2000 if local parquet
+    max_q = int(os.getenv("BM25_MAX_QUESTIONS", "100" if not os.path.exists("data/raw/train/hintrain.parquet") else "2000"))
+    print(f"⚠️  No BM25 cache found. Building from scratch ({max_q} questions)...")
     print("   (This runs once and saves to disk — future startups are instant)")
-    docs          = load_documents(max_questions=2000)
-    chunks        = chunk_documents(docs)
+    docs                = load_documents(max_questions=max_q)
+    chunks              = chunk_documents(docs)
     _bm25, _bm25_chunks = build_bm25_index(chunks)
     save_bm25_index(_bm25, _bm25_chunks)
 
