@@ -59,7 +59,12 @@ from backend.api.voice import voice_rag_pipeline, transcribe_audio
 from backend.retrieval.vector_search import _get_model, _get_client
 from backend.retrieval.bm25_search import _get_bm25
 from backend.retrieval.reranker import _get_reranker
-from backend.config import COLLECTION_NAME
+from backend.config import (
+    COLLECTION_NAME,
+    COLLECTION_FIXED,
+    COLLECTION_SEMANTIC,
+    COLLECTION_METADATA,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Logging setup
@@ -190,6 +195,8 @@ class QueryResponse(BaseModel):
     status:     str        # "success", "low_confidence", "error", "invalid_input"
     sources:    list[SourceChunk] = []
     latency:    LatencyBreakdown = LatencyBreakdown()
+    guardrail_triggered: bool = False
+    guardrail_layer:     str  = ""
 
 
 class VoiceQueryResponse(BaseModel):
@@ -200,6 +207,8 @@ class VoiceQueryResponse(BaseModel):
     status:     str
     sources:    list[SourceChunk] = []
     latency:    LatencyBreakdown = LatencyBreakdown()
+    guardrail_triggered: bool = False
+    guardrail_layer:     str  = ""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -223,25 +232,39 @@ async def health_check():
 @app.get("/api/status", tags=["system"])
 async def status():
     """
-    Detailed status: what's loaded, how many docs indexed.
+    Detailed status: what's loaded, how many docs indexed per collection.
     """
     try:
         client = _get_client()
-        info   = client.get_collection(COLLECTION_NAME)
-        points = info.points_count
+        collection_stats = {}
+        for col_name in [COLLECTION_FIXED, COLLECTION_SEMANTIC, COLLECTION_METADATA]:
+            try:
+                info = client.get_collection(col_name)
+                collection_stats[col_name] = info.points_count
+            except Exception:
+                collection_stats[col_name] = "not indexed"
     except Exception:
-        points = "unknown"
+        collection_stats = {"error": "Qdrant not reachable"}
 
     return {
         "status":             "ok",
-        "collection":         COLLECTION_NAME,
-        "indexed_chunks":     points,
+        "collections":        collection_stats,
+        "total_indexed":      sum(
+            v for v in collection_stats.values() if isinstance(v, int)
+        ),
         "models_loaded": {
             "embedder":  "BAAI/bge-small-en-v1.5",
             "reranker":  "cross-encoder/ms-marco-MiniLM-L-6-v2",
-            "llm":       "openai/gpt-oss-20b (Groq)",
-            "retrieval": "vector + BM25 (hybrid)",
-        }
+            "llm":       "Groq (llama-3.1 / gpt-oss-20b)",
+            "retrieval": "3-collection vector + BM25 hybrid",
+        },
+        "guardrails": [
+            "injection",
+            "unsafe_content",
+            "off_topic",
+            "confidence_gate",
+            "groundedness",
+        ],
     }
 
 
@@ -297,6 +320,8 @@ async def query(request: QueryRequest):
         status     = result["status"],
         sources    = sources,
         latency    = latency,
+        guardrail_triggered = result.get("guardrail_triggered", False),
+        guardrail_layer     = result.get("guardrail_layer", ""),
     )
 
 

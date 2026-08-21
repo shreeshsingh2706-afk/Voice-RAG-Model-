@@ -9,181 +9,243 @@ app_file: app.py
 pinned: false
 ---
 
-# 🎙️ Voice-Enabled RAG Model (MSMARCO-XI)
+# 🎙️ Voice-Enabled RAG System — HH Goa 2026, Task 2
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111.0-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
 [![Next.js](https://img.shields.io/badge/Next.js-14.2-black.svg?style=flat&logo=next.js)](https://nextjs.org/)
-[![Qdrant](https://img.shields.io/badge/Qdrant-Vector_DB-dc2626.svg?style=flat)](https://qdrant.tech/)
+[![Qdrant](https://img.shields.io/badge/Qdrant-3_Collections-dc2626.svg?style=flat)](https://qdrant.tech/)
 [![BGE Embeddings](https://img.shields.io/badge/Embeddings-BGE--small--en--v1.5-blue.svg)](https://huggingface.co/BAAI/bge-small-en-v1.5)
 [![Sarvam AI](https://img.shields.io/badge/STT-Sarvam_Saaras:v3-orange.svg)](https://www.sarvam.ai/)
-[![Groq](https://img.shields.io/badge/LLM-Groq_LPU_Inference-f97316.svg)](https://groq.com/)
+[![Groq](https://img.shields.io/badge/LLM-Groq_LPU-f97316.svg)](https://groq.com/)
 
-An end-to-end, production-grade **Voice-Enabled Retrieval-Augmented Generation (RAG)** system built for **HH Goa 2026 Task 2**. The model listens to spoken queries in Indian English and Hindi, transcribes them using Sarvam AI STT, performs hybrid vector + BM25 keyword retrieval over the **ai4bharat/MSMARCO-XI** dataset, reranks candidates using a Cross-Encoder, and synthesizes grounded answers with Groq LPU inference.
+An end-to-end, production-grade **Voice-Enabled Retrieval-Augmented Generation (RAG)** system built for **HH Goa 2026, Task 2**.
 
 ---
 
-## 🏛️ System Architecture
+## 🏛️ Architecture
 
 ```
-                                  USER AUDIO INPUT
+[Browser mic] ──audio(webm/wav)──▶ [FastAPI /api/voice]
+                                          │
+                               Sarvam STT (retry ×2, timeout, fallback)
+                                          │
+                                   transcript + confidence
+                                          │
+                          ┌──────────────────────────────────┐
+                          │  Input Guardrails (3 layers)     │
+                          │  1. Prompt injection detection   │
+                          │  2. Unsafe content blocklist     │
+                          │  3. Off-topic filter (embedding  │
+                          │     similarity vs corpus centroid│
+                          └──────────────┬───────────────────┘
+                                         │ blocked → reject w/ reason, log
+                                         ▼
+                                [Query Embedding]
+                                    (BGE-small)
                                          │
+                    ┌────────────────────┼────────────────────┐
+                    ▼                    ▼                    ▼
+          [msmarco_fixed]      [msmarco_semantic]   [msmarco_metadata]
+          (fixed-size chunks)  (sentence-boundary)  (metadata + filtered)
+                    └────────────────────┼────────────────────┘
                                          ▼
-                            ┌─────────────────────────┐
-                            │    Sarvam AI STT        │
-                            │   (Saaras:v3 Model)     │
-                            └────────────┬────────────┘
-                                         │  (Transcribed Text)
-                                         ▼
-                            ┌─────────────────────────┐
-                            │    Input Guardrails     │ ◄── Injection / Policy Filter
-                            └────────────┬────────────┘
+                          Reciprocal Rank Fusion (RRF k=60)
+                               top-20 candidates
                                          │
-                       ┌─────────────────┴─────────────────┐
-                       ▼                                   ▼
-        ┌────────────────────────────┐      ┌────────────────────────────┐
-        │  Semantic Vector Search    │      │    BM25 Keyword Search     │
-        │  (BGE-small-en + Qdrant)   │      │    (Rank-BM25 In-Memory)   │
-        └──────────────┬─────────────┘      └──────────────┬─────────────┘
-                       │                                   │
-                       └─────────────────┬─────────────────┘
-                                         ▼
-                            ┌─────────────────────────┐
-                            │  Reciprocal Rank Fusion │
-                            │       (RRF k=60)        │
-                            └────────────┬────────────┘
-                                         │  (Top 10 Candidates)
-                                         ▼
-                            ┌─────────────────────────┐
-                            │  Cross-Encoder Reranker │
-                            │ (ms-marco-MiniLM-L-6-v2)│
-                            └────────────┬────────────┘
-                                         │  (Top 3 Grounded Passages)
-                                         ▼
-                            ┌─────────────────────────┐
-                            │  Grounded Generation    │
-                            │  (Groq LPU / Llama 3)   │
-                            └────────────┬────────────┘
+                          [Cross-Encoder Reranker] → top-5
+                          (ms-marco-MiniLM-L-6-v2)
                                          │
-                                         ▼
-                            ┌─────────────────────────┐
-                            │   Output Guardrails     │ ◄── Hallucination Defense
-                            └────────────┬────────────┘
-                                         │
-                                         ▼
-                              STRUCTURED VOICE RESPONSE
+                   ┌────────────────────────────────────┐
+                   │  Retrieval Confidence Gate         │
+                   │  rerank_score < -2.0 → refuse      │
+                   └──────────────────┬─────────────────┘
+                                      ▼
+                      [LLM Generation — Groq]
+                      (streaming, cited chunks)
+                                      │
+                   ┌──────────────────────────────────────┐
+                   │  Groundedness Verification           │
+                   │  Stage 1: Lexical overlap (<1ms)     │
+                   │  Stage 2: LLM self-check (opt, env)  │
+                   └──────────────────┬───────────────────┘
+                                      ▼
+                              [Response to client]
+                    (per-stage timers logged throughout)
 ```
 
 ---
 
-## ✨ Key Features
+## 🧠 Component Decisions
 
-1. **Sub-200ms Retrieval**: Vector search (BGE-small) and BM25 keyword search executed in parallel using `ThreadPoolExecutor`, combined via Reciprocal Rank Fusion (RRF) and Cross-Encoder reranking.
-2. **Sarvam AI Voice Integration**: Indian-accent optimized speech-to-text with support for English (`en-IN`), Hindi (`hi-IN`), and auto-detection.
-3. **Multi-Stage Ingestion**: Ingests `ai4bharat/MSMARCO-XI` multi-passage dataset with smart short-text preservation and fixed-size chunking.
-4. **Comprehensive Guardrails**:
-   - **Input Guard**: Prompt injection prevention, jailbreak detection, and input length sanitization.
-   - **Grounding Verification**: Lexical and entity grounding checks preventing factual hallucinations.
-   - **Output Guard**: Replaces ungrounded claims with graceful refusals.
-5. **Full Observability**: Detailed latency breakdown per pipeline stage (STT, Vector, BM25, Reranker, LLM, Total) with automated P50/P70/P100 benchmarking.
-6. **Glassmorphic Web Dashboard**: Next.js 14 frontend with live audio recording waveform, language switching, latency visualizer, and evidence passage cards.
+### STT: Sarvam AI (`saaras:v3`)
+**Choice**: Sarvam AI over ElevenLabs.  
+**Reason**: Sarvam is purpose-built for Indian languages and accents — it handles Hindi, Tamil, Bengali, and Indian English with far better WER than generic STT APIs. Since `ai4bharat/MSMARCO-XI` is an Indic-multilingual dataset and the target audience speaks Indian English/Hindi, this is a direct match. Sarvam also offers structured confidence scores per utterance, enabling the "please repeat" fallback.
 
----
+### Embeddings: `BAAI/bge-small-en-v1.5`
+**Choice**: BGE-small (384-dim) over multilingual-e5-large.  
+**Reason**: MSMARCO-XI English split is the primary retrieval target. BGE-small achieves excellent MSMARCO retrieval quality at 33MB and runs embedding in <50ms on CPU — critical for the sub-200ms retrieval budget. Multilingual-e5-large (560MB) would push retrieval well past 200ms on CPU.
 
-## ⚡ Latency Benchmarks (P50 / P70 / P100)
+### Vector DB: Qdrant (3 collections)
+Three separate collections — one per chunking strategy — allow:
+1. Parallel fan-out retrieval for better recall
+2. Strategy quality comparison (see table below)
+3. Payload-filtered search on the metadata collection
 
-| Pipeline Stage | P50 (Median) | P70 | P100 (Max) | Mean |
-| :--- | :--- | :--- | :--- | :--- |
-| **Vector Search (BGE-small)** | `61.5 ms` | `93.5 ms` | `284.2 ms` | `98.3 ms` |
-| **BM25 Keyword Search** | `20.2 ms` | `26.9 ms` | `74.7 ms` | `27.3 ms` |
-| **Cross-Encoder Reranker** | `129.2 ms` | `198.1 ms` | `273.2 ms` | `158.8 ms` |
-| **Total Retrieval Time** | **`243.2 ms`** | `340.7 ms` | `515.0 ms` | `284.5 ms` |
-| **LLM Generation (Groq LPU)** | `292.3 ms` | `740.9 ms` | `1098.0 ms` | `412.7 ms` |
-| **End-to-End Pipeline** | **`651.7 ms`** | `992.6 ms` | `1547.5 ms` | `697.9 ms` |
+### LLM: Groq (llama-3.1-8b-instant / gpt-oss-20b)
+Sub-second generation (P50 ~300ms) is only achievable with Groq's LPU inference. OpenAI/Anthropic APIs typically take 2–5s — incompatible with a voice-first UX.
+
+### Reranker: `cross-encoder/ms-marco-MiniLM-L-6-v2`
+Applied to top-20 candidates → picks top-5. This specific model is trained on MSMARCO — directly improving precision on our exact dataset.
 
 ---
 
-## 🚀 Quickstart Guide
+## 📦 Chunking Strategy Comparison
 
-### 1. Prerequisites
-- Python 3.11+
-- Node.js 18+
-- Groq API Key ([console.groq.com](https://console.groq.com))
-- Sarvam AI API Key ([dashboard.sarvam.ai](https://dashboard.sarvam.ai))
+Three strategies, three collections. Each is an independent "view" of the same corpus.
 
-### 2. Environment Setup
+| Strategy | Collection | Description | Avg Words | Best For |
+|---|---|---|---|---|
+| **Fixed-size** | `msmarco_fixed` | 300-word window, 50-word overlap | ~85 | Broad context windows, consistent length |
+| **Semantic** | `msmarco_semantic` | Sentence-boundary split, greedy merge ≤250 words | ~70 | Coherent passages, no mid-sentence cuts |
+| **Metadata-aware** | `msmarco_metadata` | Semantic + payload indexing (language, position, doc_id) | ~70 | Filtered search by language / query type |
+
+> See `backend/ingestion/chunkers.py` for the implementation of all three strategies with the common `chunk(doc) -> List[Chunk]` interface.
+
+---
+
+## 🛡️ Guardrails
+
+All guardrail triggers are logged (which layer, why) and returned in the API response (`guardrail_triggered`, `guardrail_layer`).
+
+### Input Guardrails (3 layers, run before retrieval)
+
+| Layer | Mechanism | Example Trigger |
+|---|---|---|
+| **Prompt injection** | Regex patterns (15+ rules) | `"Ignore all previous instructions..."` |
+| **Unsafe content** | Keyword blocklist | `"How to make a bomb..."` |
+| **Off-topic filter** | Cosine similarity < 0.25 vs corpus centroid | `"What's the best pizza recipe?"` |
+
+**Off-topic filter detail**: A corpus centroid is computed once at startup from 20 representative MSMARCO passages. Query embedding cosine similarity < 0.25 → rejected with a clear explanation. This catches queries completely unrelated to search Q&A without a slow LLM call.
+
+### Retrieval Confidence Gate
+If the top cross-encoder rerank score < −2.0 (threshold tuned on MSMARCO score distribution), the system returns:
+> "I don't have enough information in the provided dataset to answer this question confidently."
+
+No LLM call is made — saves cost and latency, and avoids hallucination.
+
+### Output Groundedness Verification (2 stages)
+| Stage | Method | Latency | Triggers |
+|---|---|---|---|
+| **Lexical** | Token overlap answer ∩ context | <1ms | Score < 35% → ungrounded |
+| **LLM self-check** | Groq: "Does context support answer?" | ~400ms | 35–65% borderline (opt-in via `ENABLE_LLM_GROUNDEDNESS=true`) |
+
+---
+
+## ⚡ Latency Report
+
+> **Honest breakdown**: The 200ms target applies to the **retrieval-only stage** (embedding + vector search + RRF). Sarvam STT and Groq LLM are external network calls with hard lower bounds of 500–1500ms each — these cannot be reduced by implementation. We report both numbers transparently.
+
+See **[`backend/eval/latency_report.md`](backend/eval/latency_report.md)** for the full P50/P70/P100 table (75 queries sampled from MSMARCO-XI).
+
+Summary (approximate — see report for exact numbers with sample size):
+
+| Stage | P50 | P70 | P100 |
+|---|---|---|---|
+| Query Embedding | ~45ms | ~80ms | ~180ms |
+| 3-Collection Vector Search | ~60ms | ~100ms | ~250ms |
+| Cross-Encoder Reranker | ~130ms | ~200ms | ~280ms |
+| **Retrieval-Only Total** | **~240ms** | ~380ms | ~520ms |
+| LLM Generation (Groq) | ~320ms | ~750ms | ~1100ms |
+| **End-to-End (text in)** | **~670ms** | ~1100ms | ~1600ms |
+
+---
+
+## 🚀 Quickstart
+
+### Prerequisites
+- Python 3.11+, Node.js 18+
+- [Groq API key](https://console.groq.com)
+- [Sarvam AI API key](https://dashboard.sarvam.ai)
+
+### 1. Environment Setup
 
 ```bash
-# Clone the repository
 git clone https://github.com/shreeshsingh2706-afk/Voice-RAG-Model-.git
 cd Voice-RAG-Model-
-
-# Create and activate Python virtual environment
-python3.11 -m venv venv
-source venv/bin/activate
-
-# Install backend dependencies
+python3.11 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Configure `.env`
-
-Create a `.env` file in the root directory:
+### 2. Configure `.env`
 
 ```env
-# Groq LLM API Key
-GROQ_API_KEY=gsk_your_groq_api_key_here
+GROQ_API_KEY=gsk_your_key_here
+SARVAM_API_KEY=your_sarvam_key_here
 
-# Qdrant Database (local on-disk mode)
 QDRANT_MODE=local
 QDRANT_LOCAL_PATH=./data/qdrant
 
-# Sarvam Speech-to-Text Key
-SARVAM_API_KEY=your_sarvam_api_key_here
+COLLECTION_FIXED=msmarco_fixed
+COLLECTION_SEMANTIC=msmarco_semantic
+COLLECTION_METADATA=msmarco_metadata
 
-# App Parameters
-COLLECTION_NAME=msmarco_xi
 EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
-LLM_MODEL=openai/gpt-oss-20b
+LLM_MODEL=llama-3.1-8b-instant
 TOP_K_RETRIEVAL=10
-TOP_K_FINAL=3
+TOP_K_FINAL=5
+
+# Optional: enable LLM hallucination self-check (adds ~400ms)
+ENABLE_LLM_GROUNDEDNESS=false
 ```
 
-### 4. Build Dataset Search Index
+### 3. Build All Three Indexes
 
 ```bash
-# Ingest 2,000 questions (~20,000 passages) into Qdrant & BM25
-python scripts/ingest.py --questions 2000 --recreate
+# Indexes ~2,000 questions (~20K passages) per strategy
+# Total: ~60K chunks, ~10–15 min on CPU
+python backend/ingestion/build_index.py --questions 2000 --recreate
 ```
 
-### 5. Start Backend Server (FastAPI)
+### 4. Start Backend
 
 ```bash
 uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+# Docs: http://localhost:8000/docs
 ```
-- API Health: `http://localhost:8000/health`
-- Interactive Swagger Docs: `http://localhost:8000/docs`
 
-### 6. Start Frontend (Next.js)
+### 5. Start Frontend
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cd frontend && npm install && npm run dev
+# Open: http://localhost:3000
 ```
-- Open Web UI: `http://localhost:3000`
+
+### 6. Docker (optional)
+
+```bash
+docker-compose up -d
+```
 
 ---
 
 ## 🧪 Testing & Evaluation
 
-Run unit and integration tests:
 ```bash
+# Unit tests
 pytest tests/ -v
-```
 
-Run P50/P70/P100 latency benchmark suite:
-```bash
-python -m backend.evaluation.latency
+# Guardrail self-tests
+python -m backend.guardrails.input_filter
+python -m backend.guardrails.groundedness
+
+# Retrieval orchestrator test
+python -m backend.retrieval.orchestrator
+
+# Latency benchmark (75 queries, P50/P70/P100)
+python backend/eval/run_latency_bench.py
+
+# Full pipeline smoke test (requires Qdrant + model)
+python -m backend.pipeline.rag_pipeline
 ```
 
 ---
@@ -192,51 +254,42 @@ python -m backend.evaluation.latency
 
 ```
 voice-rag/
+├── README.md                        # this file
 ├── backend/
-│   ├── main.py                  # FastAPI server with lifespan warm-up
-│   ├── config.py                # Centralized settings & environment loader
+│   ├── main.py                      # FastAPI server
+│   ├── config.py                    # centralized settings
 │   ├── api/
-│   │   └── voice.py             # Sarvam AI STT & audio pipeline
+│   │   └── voice.py                 # Sarvam STT + audio pipeline
 │   ├── ingestion/
-│   │   ├── load_dataset.py      # MSMARCO-XI loader (PyArrow streaming)
-│   │   ├── chunking.py          # Fixed-size overlapping chunker
-│   │   └── indexing.py          # BGE embedder & Qdrant uploader
+│   │   ├── chunkers.py              # FixedSizeChunker, SemanticChunker, MetadataAwareChunker
+│   │   ├── build_index.py           # builds all 3 Qdrant collections
+│   │   ├── indexing.py              # BGE embedder + Qdrant uploader (single collection)
+│   │   └── load_dataset.py          # MSMARCO-XI loader
 │   ├── retrieval/
-│   │   ├── vector_search.py     # Qdrant cosine similarity search
-│   │   ├── bm25_search.py       # Rank-BM25 keyword search
-│   │   ├── hybrid_search.py     # Parallel search + RRF fusion
-│   │   └── reranker.py          # MiniLM-L6 Cross-Encoder reranking
-│   ├── generation/
-│   │   └── llm.py               # Groq LLM grounded answering
+│   │   ├── orchestrator.py          # multi-collection fan-out + RRF merge (Pydantic models)
+│   │   ├── vector_search.py         # single-collection Qdrant search
+│   │   ├── bm25_search.py           # BM25 keyword search
+│   │   ├── hybrid_search.py         # vector + BM25 RRF (single collection)
+│   │   └── reranker.py              # cross-encoder reranking
 │   ├── guardrails/
-│   │   ├── input_guard.py       # Prompt injection & policy filter
-│   │   ├── grounding.py         # Grounding & hallucination detector
-│   │   └── output_guard.py      # Output verification & confidence rating
-│   └── evaluation/
-│       └── latency.py           # P50 / P70 / P100 latency benchmark
-│
-├── frontend/                    # Next.js 14 Web Application
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── page.jsx         # Main interactive UI dashboard
-│   │   │   ├── layout.jsx       # Root layout
-│   │   │   └── globals.css      # Glassmorphic cyber theme
-│   │   └── components/
-│   │       ├── AudioRecorder.jsx # Mic recorder with animated waveform
-│   │       ├── LatencyVisualizer.jsx # Multi-segment stage latency bar
-│   │       └── SourceCards.jsx  # Evidence cards with scores & gold badges
-│   └── package.json
-│
-├── data/                        # Local database & index storage
+│   │   ├── input_filter.py          # 3-layer input: injection / unsafe / off-topic
+│   │   ├── groundedness.py          # 2-stage grounding: lexical + LLM self-check
+│   │   └── output_guard.py          # output verification + confidence rating
+│   ├── generation/
+│   │   └── llm.py                   # Groq LLM grounded generation
+│   ├── pipeline/
+│   │   └── rag_pipeline.py          # full orchestration
+│   └── eval/
+│       ├── run_latency_bench.py     # P50/P70/P100 benchmark (75 sampled queries)
+│       └── latency_report.md        # generated benchmark results
+├── frontend/                        # Next.js 14 web UI
 ├── scripts/
-│   └── ingest.py                # CLI for building search indexes
-├── tests/
-│   └── test_rag.py              # Pytest unit & integration test suite
-├── requirements.txt
-└── README.md
+│   └── ingest.py                    # legacy single-collection ingestion CLI
+├── docker-compose.yml               # Qdrant + backend for local dev
+└── requirements.txt
 ```
 
 ---
 
 ## 📄 License
-MIT License. Developed for HH Goa 2026.
+MIT License. Developed for HH Goa 2026, Task 2.

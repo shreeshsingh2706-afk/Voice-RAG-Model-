@@ -193,7 +193,78 @@ def voice_rag_pipeline(
 ) -> dict:
     """
     Full voice-to-answer pipeline:
-      audio bytes → STT → transcript → RAG pipeline → answer
+      audio bytes -> STT (2 retries, exp backoff) -> transcript -> RAG pipeline -> answer
+    """
+    from backend.pipeline.rag_pipeline import rag_pipeline
+    import time as _time
+
+    pipeline_start = _time.time()
+
+    # ── Step 1: STT with 2 retries + exponential backoff ─────────────────────
+    stt_result = None
+    for attempt in range(3):  # initial + 2 retries
+        stt_result = transcribe_audio(audio_bytes, language_code, filename, content_type)
+        if stt_result["status"] in ("success", "empty"):
+            break
+        if attempt < 2:
+            _time.sleep(0.5 * (2 ** attempt))  # 0.5s, 1.0s
+
+    if stt_result["status"] == "error":
+        return {
+            "transcript": "",
+            "answer": (
+                f"Speech-to-text failed after retries: {stt_result.get('error', 'Unknown error')}. "
+                "Please try again or type your question directly."
+            ),
+            "confidence": "none",
+            "status": "stt_error",
+            "sources": [],
+            "guardrail_triggered": False,
+            "guardrail_layer": "",
+            "latency": {"stt_ms": stt_result.get("stt_ms", 0), "total_ms": 0},
+        }
+
+    transcript = stt_result["transcript"]
+
+    if not transcript:
+        return {
+            "transcript": "",
+            "answer": "Could not detect speech in the audio. Please speak clearly and try again.",
+            "confidence": "none",
+            "status": "empty_transcript",
+            "sources": [],
+            "guardrail_triggered": False,
+            "guardrail_layer": "",
+            "latency": {"stt_ms": stt_result.get("stt_ms", 0), "total_ms": 0},
+        }
+
+    # ── Step 2: RAG pipeline ──────────────────────────────────────────────────
+    rag_result = rag_pipeline(transcript)
+
+    # ── Step 3: Merge latency ─────────────────────────────────────────────────
+    total_ms    = round((_time.time() - pipeline_start) * 1000, 1)
+    rag_latency = rag_result.get("latency", {})
+
+    combined_latency = {
+        "stt_ms":    stt_result.get("stt_ms", 0),
+        "embed_ms":  rag_latency.get("embed_ms", rag_latency.get("vector_ms", 0)),
+        "search_ms": rag_latency.get("search_ms", 0),
+        "rrf_ms":    rag_latency.get("rrf_ms", 0),
+        "rerank_ms": rag_latency.get("rerank_ms", 0),
+        "llm_ms":    rag_latency.get("llm_ms", 0),
+        "total_ms":  total_ms,
+    }
+
+    return {
+        "transcript":          transcript,
+        "answer":              rag_result.get("answer", ""),
+        "confidence":          rag_result.get("confidence", "medium"),
+        "status":              rag_result.get("status", "success"),
+        "sources":             rag_result.get("sources", []),
+        "guardrail_triggered": rag_result.get("guardrail_triggered", False),
+        "guardrail_layer":     rag_result.get("guardrail_layer", ""),
+        "latency":             combined_latency,
+    }
 
     PARAMETERS:
         audio_bytes   : raw audio from microphone or file

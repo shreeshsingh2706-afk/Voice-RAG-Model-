@@ -15,7 +15,7 @@ HOW TO RUN:
 """
 
 from dataclasses import dataclass
-from backend.guardrails.grounding import verify_grounding, GroundingResult
+from backend.guardrails.groundedness import verify_groundedness, GroundednessResult
 
 @dataclass
 class OutputGuardResult:
@@ -44,8 +44,8 @@ def check_output_guardrails(
             reason="Empty answer provided."
         )
 
-    # Run grounding verification
-    grounding: GroundingResult = verify_grounding(raw_answer, context_chunks, threshold=0.45)
+    # Run grounding verification (uses the 2-stage groundedness checker)
+    grounding: GroundednessResult = verify_groundedness(raw_answer, context_chunks)
 
     if not grounding.is_grounded:
         return OutputGuardResult(
@@ -53,7 +53,7 @@ def check_output_guardrails(
             final_answer="I could not verify the accuracy of the generated answer against the retrieved evidence.",
             confidence="low",
             grounding_score=grounding.grounding_score,
-            reason=f"Failed grounding verification ({grounding.grounding_score:.1%} match). Unsupported concepts: {grounding.unsupported_entities}"
+            reason=f"Failed grounding verification ({grounding.grounding_score:.1%} match). Unsupported: {grounding.unsupported_claims[:3]}"
         )
 
     # Adjust confidence if high grounding score
@@ -68,7 +68,7 @@ def check_output_guardrails(
         final_answer=raw_answer,
         confidence=final_confidence,
         grounding_score=grounding.grounding_score,
-        reason="Output passed grounding and safety checks."
+        reason=f"Output passed grounding check (stage={grounding.stage}, score={grounding.grounding_score:.1%})."
     )
 
 

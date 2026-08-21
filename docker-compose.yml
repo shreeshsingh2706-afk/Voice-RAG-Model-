@@ -1,0 +1,74 @@
+version: "3.9"
+
+# Voice-RAG — Local Development Stack
+# =====================================
+# Runs Qdrant + FastAPI backend together.
+# Frontend (Next.js) runs separately: cd frontend && npm run dev
+#
+# Usage:
+#   docker-compose up -d          # start in background
+#   docker-compose logs -f        # stream logs
+#   docker-compose down           # stop and remove containers
+
+services:
+
+  # ── Qdrant Vector Database ────────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: voice-rag-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC API
+    volumes:
+      - ./data/qdrant:/qdrant/storage  # persist vectors on disk
+    environment:
+      QDRANT__LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── FastAPI Backend ───────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voice-rag-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Override Qdrant URL to point to the Docker service
+      QDRANT_MODE: cloud
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ""
+      # Lazy load to reduce startup time in dev
+      LAZY_LOAD: "true"
+    volumes:
+      # Mount code for hot-reload in dev
+      - ./backend:/app/backend
+      - ./data:/app/data
+    command: >
+      uvicorn backend.main:app
+        --host 0.0.0.0
+        --port 8000
+        --reload
+        --log-level info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  qdrant_storage:
+    driver: local
