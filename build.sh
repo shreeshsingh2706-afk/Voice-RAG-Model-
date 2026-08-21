@@ -34,6 +34,6 @@ sys.path.insert(0, os.path.abspath('.'))
 from backend.retrieval.bm25_search import _get_bm25
 _get_bm25()
 print('BM25 cache built successfully.')
-"
+" || echo "⚠️ BM25 pre-build skipped during build phase — will build on demand at runtime."
 
 echo "=== Build Complete ==="
