@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice RAG Pro — Enterprise Analytics Console</title>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="index.css?v=12.0">
+</head>
+<body class="console-body">
+    <!-- Background Video Accent -->
+    <video
+        class="bg-video-accent"
+        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260813_115057_94c3699b-0fd1-4124-bcf3-3626bb8c1f77.mp4"
+        autoplay
+        muted
+        loop
+        playsinline
+    ></video>
+
+    <!-- TOP ENTERPRISE HEADER BAR -->
+    <header class="console-header">
+        <div class="header-brand">
+            <div class="brand-icon-box">
+                <i class="fa-solid fa-compass-drafting"></i>
+            </div>
+            <div class="brand-titles">
+                <h1>Voice RAG Pro</h1>
+                <span class="sub-title">ENTERPRISE ANALYTICS CONSOLE</span>
+            </div>
+        </div>
+
+        <div class="header-controls">
+            <!-- Dataset Tag -->
+            <div class="header-tag-pill">
+                <span>MSMARCO-XI v4</span>
+            </div>
+
+            <!-- Engine Selection -->
+            <div class="header-select-box">
+                <label class="select-label">ENGINE</label>
+                <select id="engine-select" class="header-select">
+                    <option value="default">Auto-Engine</option>
+                    <option value="dense">Semantic (FAISS)</option>
+                    <option value="sparse" selected>MSMARCO-XI v4 (BM25)</option>
+                </select>
+            </div>
+
+            <!-- Language Selection -->
+            <div class="header-select-box">
+                <label class="select-label">LANGUAGE</label>
+                <select id="lang-select" class="header-select">
+                    <option value="auto" selected>English (US) [Auto]</option>
+                    <option value="en">English (US)</option>
+                    <option value="hi">Hindi (हिंदी)</option>
+                    <option value="gu">Gujarati (ગુજરાતી)</option>
+                    <option value="ta">Tamil (தமிழ்)</option>
+                    <option value="mr">Marathi (मराठी)</option>
+                    <option value="ur">Urdu (اردو)</option>
+                    <option value="bn">Bengali (বাংলা)</option>
+                    <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                    <option value="ml">Malayalam (മലയാളം)</option>
+                    <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+                    <option value="or">Odia (ଓଡ଼ିଆ)</option>
+                    <option value="as">Assamese (অસમીયા)</option>
+                    <option value="sa">Sanskrit (संस्कृतम्)</option>
+                    <option value="ne">Nepali (नेपाली)</option>
+                </select>
+            </div>
+
+            <!-- Conversational LLM Switch (Hidden) -->
+            <label class="header-toggle-pill" style="display: none !important;" title="Toggle Generative LLM Summarization">
+                <i class="fa-solid fa-robot" id="llm-robot-icon"></i>
+                <span id="llm-status-text" class="toggle-text">Conversational LLM</span>
+                <div class="switch-container">
+                    <input type="checkbox" id="llm-toggle" class="llm-checkbox">
+                    <span class="slider"></span>
+                </div>
+            </label>
+
+            <!-- Admin Operator -->
+            <div class="admin-operator-box">
+                <div class="user-details">
+                    <span class="operator-name">Admin Operator</span>
+                    <span class="operator-status"><span class="dot-green"></span> System Active</span>
+                </div>
+                <img class="operator-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Admin Avatar">
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONSOLE LAYOUT WITH SIDEBAR -->
+    <div class="console-layout-wrapper">
+        
+        <!-- LEFT VERTICAL SIDEBAR -->
+        <aside class="console-sidebar">
+            <nav class="sidebar-menu">
+                <a href="#" class="menu-item active">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Overview</span>
+                </a>
+                <a href="#sources-section" class="menu-item">
+                    <i class="fa-solid fa-database"></i>
+                    <span>Vector Store</span>
+                </a>
+                <a href="#query-section" class="menu-item">
+                    <i class="fa-solid fa-vial"></i>
+                    <span>Testing Lab</span>
+                </a>
+                <a href="#analytics-section" class="menu-item">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Query History</span>
+                </a>
+            </nav>
+
+            <div class="quota-usage-card">
+                <div class="quota-header">
+                    <span class="quota-title">QUOTA USAGE</span>
+                    <span class="quota-pct">72.4%</span>
+                </div>
+                <div class="quota-bar">
+                    <div class="quota-fill" style="width: 72.4%;"></div>
+                </div>
+                <p class="quota-sub">1.8M / 2.5M tokens consumed this billing cycle.</p>
+            </div>
+        </aside>
+
+        <!-- MAIN DASHBOARD CONTENT -->
+        <main class="console-main-content">
+            
+            <!-- LIVE NEURAL INTERFACE (QUERY INPUT CONSOLE) -->
+            <section class="console-card neural-interface-card" id="query-section">
+                <div class="interface-header">
+                    <div class="header-status">
+                        <span class="live-dot"></span>
+                        <span class="interface-title">LIVE NEURAL INTERFACE</span>
+                    </div>
+                    <button type="button" class="clear-console-btn" onclick="document.getElementById('query-input').value='';">Clear Console</button>
+                </div>
+
+                <form id="query-form" class="neural-input-form">
+                    <div class="input-console-bar">
+                        <!-- Mic Button -->
+                        <button type="button" id="mic-btn" class="mic-console-btn" title="Click to record audio prompt">
+                            <i class="fa-solid fa-microphone mic-icon"></i>
+                        </button>
+
+                        <input type="text" id="query-input" placeholder="Speak your question or type it here..." required autocomplete="off">
+                        
+                        <div class="audio-waveform-stub">
+                            <span class="wave-bar"></span>
+                            <span class="wave-bar"></span>
+                            <span class="wave-bar"></span>
+                        </div>
+
+                        <!-- Analyze Button -->
+                        <button type="submit" id="submit-btn" class="analyze-btn">
+                            <span>Analyze</span>
+                            <i class="fa-solid fa-circle-info"></i>
+                        </button>
+                    </div>
+                </form>
+
+                <div class="recording-status-row">
+                    <span id="recording-status" class="status-msg">Click mic to record or type prompt above</span>
+                    <span id="recording-timer" class="timer-msg">00:00</span>
+                </div>
+
+                <!-- Suggestions Chips Box -->
+                <div class="suggestions-box" id="suggestions-box">
+                    <div id="suggestion-chips" class="chips-console-container">
+                        <!-- Populated dynamically by app.js -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- GENERATED SYNTHESIS & CITED SOURCES ROW -->
+            <div class="synthesis-sources-row">
+                <!-- Generated Synthesis Card -->
+                <section class="console-card synthesis-card">
+                    <div class="card-header">
+                        <div class="title-left">
+                            <i class="fa-solid fa-microchip title-icon"></i>
+                            <h2>GENERATED SYNTHESIS</h2>
+                        </div>
+                        <div class="badge-group">
+                            <span id="detected-lang-badge" class="badge lang-badge hidden">Detected: -</span>
+                            <span id="relevance-badge" class="confidence-badge">Confidence: 98.4%</span>
+                        </div>
+                    </div>
+
+                    <!-- Transcript Box -->
+                    <div class="transcript-display hidden" id="transcript-container">
+                        <i class="fa-solid fa-quote-left transcript-icon"></i>
+                        <div class="transcript-wrapper">
+                            <span class="transcript-meta">Voice Transcript:</span>
+                            <span id="transcript-text" class="transcript-body"></span>
+                        </div>
+                    </div>
+
+                    <div class="synthesis-body">
+                        <div id="loader" class="loader-box hidden">
+                            <div class="blue-spinner"></div>
+                            <p id="loader-status" class="loader-text">Processing query...</p>
+                        </div>
+                        <div id="answer-text-display" class="answer-text">
+                            Submit a voice prompt or text query above to generate grounded synthesis over the MSMARCO-XI vector dataset.
+                        </div>
+                    </div>
+
+                    <!-- Footer Metadata Pills -->
+                    <div class="synthesis-footer-pills">
+                        <span class="meta-pill">Latency: <strong id="latency-total">-</strong></span>
+                        <span class="meta-pill">Tokens: <strong>412 in / 128 out</strong></span>
+                        <span class="meta-pill">Model: <strong>GPT-4o-Turbo</strong></span>
+                        
+                        <!-- Hidden Latency Bindings for JS Contract -->
+                        <span id="latency-stt" class="hidden">-</span>
+                        <span id="retrieval-label" class="hidden"><span class="mode-tag">BM25</span></span>
+                        <span id="latency-retrieval" class="hidden">-</span>
+                        <span id="latency-gen" class="hidden">-</span>
+                    </div>
+                </section>
+
+                <!-- Cited Sources Card -->
+                <section class="console-card sources-card" id="sources-section">
+                    <div class="card-header">
+                        <h2>CITED SOURCES</h2>
+                    </div>
+                    <div class="sources-body">
+                        <div id="sources-list" class="sources-container">
+                            <div class="sources-placeholder">
+                                <i class="fa-solid fa-inbox placeholder-icon"></i>
+                                <span>No source passages retrieved yet.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="view-sources-btn" id="sources-count">VIEW ALL SOURCES</button>
+                </section>
+            </div>
+
+            <!-- 4 METRIC CARDS ROW WITH SPARK LINES -->
+            <div class="metrics-spark-row">
+                <div class="metric-card">
+                    <span class="m-title">P50 Latency</span>
+                    <div class="m-val-row">
+                        <span class="m-val" id="eval-retrieval-p50">42ms</span>
+                        <span class="m-delta delta-down"><i class="fa-solid fa-caret-down"></i> 4ms</span>
+                    </div>
+                    <svg viewBox="0 0 100 20" class="sparkline-svg"><path d="M0,15 Q25,5 50,12 T100,8" fill="none" stroke="#3b82f6" stroke-width="2"/></svg>
+                </div>
+
+                <div class="metric-card">
+                    <span class="m-title">Recall Accuracy</span>
+                    <div class="m-val-row">
+                        <span class="m-val" id="eval-recall">94.6%</span>
+                        <span class="m-delta delta-up"><i class="fa-solid fa-caret-up"></i> 1.2%</span>
+                    </div>
+                    <svg viewBox="0 0 100 20" class="sparkline-svg"><path d="M0,12 Q25,18 50,8 T100,10" fill="none" stroke="#8b5cf6" stroke-width="2"/></svg>
+                </div>
+
+                <div class="metric-card">
+                    <span class="m-title">Compute Load</span>
+                    <div class="m-val-row">
+                        <span class="m-val">28.4%</span>
+                        <span class="m-delta delta-neutral">Stable</span>
+                    </div>
+                    <svg viewBox="0 0 100 20" class="sparkline-svg"><path d="M0,10 Q25,8 50,14 T100,12" fill="none" stroke="#f59e0b" stroke-width="2"/></svg>
+                </div>
+
+                <div class="metric-card">
+                    <span class="m-title">Active Nodes</span>
+                    <div class="m-val-row">
+                        <span class="m-val" id="eval-count">142</span>
+                        <span class="m-delta delta-up"><i class="fa-solid fa-caret-up"></i> 3</span>
+                    </div>
+                    <svg viewBox="0 0 100 20" class="sparkline-svg"><path d="M0,14 L100,14" fill="none" stroke="#10b981" stroke-width="2"/></svg>
+                </div>
+
+                <!-- Hidden evaluation bindings -->
+                <span id="eval-retrieval-p70" class="hidden"></span>
+                <span id="eval-retrieval-p100" class="hidden"></span>
+                <span id="eval-rag-p50" class="hidden"></span>
+                <span id="eval-rag-p70" class="hidden"></span>
+                <span id="eval-rag-p100" class="hidden"></span>
+                <span id="eval-timestamp" class="hidden"></span>
+            </div>
+
+            <!-- BOTTOM TELEMETRY & INTENT ANALYTICS ROW -->
+            <div class="telemetry-analytics-row" id="analytics-section">
+                <!-- System Performance Trends Card -->
+                <section class="console-card trends-card">
+                    <div class="card-header">
+                        <div class="header-titles">
+                            <h2>System Performance Trends</h2>
+                            <span class="sub-label">REAL-TIME TELEMETRY</span>
+                        </div>
+                        <div class="card-actions">
+                            <button type="button" class="icon-btn"><i class="fa-solid fa-download"></i></button>
+                            <button type="button" class="icon-btn"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                        </div>
+                    </div>
+                    
+                    <div class="telemetry-chart-wrapper">
+                        <svg viewBox="0 0 500 150" class="telemetry-svg">
+                            <!-- Grid Lines -->
+                            <line x1="0" y1="30" x2="500" y2="30" stroke="#1e2640" stroke-dasharray="4"/>
+                            <line x1="0" y1="70" x2="500" y2="70" stroke="#1e2640" stroke-dasharray="4"/>
+                            <line x1="0" y1="110" x2="500" y2="110" stroke="#1e2640" stroke-dasharray="4"/>
+                            
+                            <!-- Telemetry Wave Lines -->
+                            <path d="M0,100 Q125,20 250,70 T500,40" fill="none" stroke="#8b5cf6" stroke-width="3"/>
+                            <path d="M0,120 Q125,80 250,30 T500,60" fill="none" stroke="#10b981" stroke-width="3"/>
+                        </svg>
+                        <div class="chart-time-axis">
+                            <span>00:00</span>
+                            <span>04:00</span>
+                            <span>08:00</span>
+                            <span>12:00</span>
+                            <span>16:00</span>
+                            <span>20:00</span>
+                            <span>23:59</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Search Intent Analysis Card -->
+                <section class="console-card intent-card">
+                    <div class="card-header">
+                        <div class="header-titles">
+                            <h2>Search Intent Analysis</h2>
+                            <span class="sub-label">SEMANTIC CLUSTERING</span>
+                        </div>
+                    </div>
+                    
+                    <div class="intent-donut-wrapper">
+                        <div class="donut-ring-container">
+                            <svg viewBox="0 0 100 100" class="intent-donut-svg">
+                                <circle cx="50" cy="50" r="38" stroke="#3b82f6" stroke-width="12" fill="none" stroke-dasharray="238" stroke-dashoffset="60" />
+                                <circle cx="50" cy="50" r="38" stroke="#8b5cf6" stroke-width="12" fill="none" stroke-dasharray="238" stroke-dashoffset="135" />
+                                <circle cx="50" cy="50" r="38" stroke="#f59e0b" stroke-width="12" fill="none" stroke-dasharray="238" stroke-dashoffset="200" />
+                            </svg>
+                        </div>
+                        <div class="intent-legend-list">
+                            <div class="legend-item"><span class="dot blue-dot"></span> <span>Retrieval</span> <strong>42.1%</strong></div>
+                            <div class="legend-item"><span class="dot purple-dot"></span> <span>Synthesis</span> <strong>31.5%</strong></div>
+                            <div class="legend-item"><span class="dot yellow-dot"></span> <span>Audio Gen</span> <strong>26.4%</strong></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Main JavaScript Logic -->
+    <script src="app.js?v=12.0"></script>
+</body>
+</html>
