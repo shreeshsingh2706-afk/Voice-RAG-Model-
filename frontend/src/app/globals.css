@@ -19,9 +19,15 @@
   --accent-amber: #f59e0b;
   --accent-rose: #f43f5e;
 
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  /* Color Template Swatches */
+  --color-smoky-black: #11120D;
+  --color-olive-drab: #565449;
+  --color-bone: #D8CFBC;
+  --color-floral-white: #FFFBF4;
+
+  --text-main: #FFFBF4;     /* Floral White - Primary Font & Headings */
+  --text-muted: #D8CFBC;    /* Bone - Secondary Font & Subheadings */
+  --text-dim: #565449;      /* Olive Drab - Muted Font */
 
   --glow-cyan: 0 0 35px rgba(6, 182, 212, 0.25);
   --glow-indigo: 0 0 35px rgba(99, 102, 241, 0.25);
