@@ -624,4 +624,29 @@ body.console-body {
 /* Scrollbars */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   CONSOLE FOOTER
+   ─────────────────────────────────────────────────────────────────────────── */
+.console-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 24px;
+    margin-top: 8px;
+    background: var(--glass-level2-bg);
+    backdrop-filter: var(--glass-blur-level2);
+    -webkit-backdrop-filter: var(--glass-blur-level2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-card);
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.03em;
+}
+
+.console-footer strong {
+    color: #ffffff;
+    font-weight: 700;
+    margin-left: 4px;
+}
